@@ -1,6 +1,6 @@
 PYTHON_VERSION = 3.14.6
 POETRY_VERSION = 2.4.1
-REPO_NAME = bountiful-yield
+REPO_NAME = spoilt-for-choice
 VENV_DIR = .venv
 
 init:
@@ -27,4 +27,7 @@ lock:
 	poetry lock -vv
 
 run: 
-	uvicorn src.app.main:app --reload --port 5000 --env-file conf/dev.env
+	python -m options_engine.main
+
+app:
+	streamlit run app.py
