@@ -1,15 +1,21 @@
 [tool.poetry]
-name = "bountiful-yield"
+name = "spoilt-for-choice"
 version = "0.0.1"
-description = "bountiful-yield"
+description = "spoilt-for-choice"
 authors = ["Gustav Durlind <gustav.durlind@hotmail.com>"]
 readme = "README.md"
 
 [[tool.poetry.packages]]
-include = "src"
+include = "options_engine"
 
 [tool.poetry.dependencies]
 python = "^3.14"
+numpy = "^1.26.1"
+pandas = "^2.2.2"
+scipy = "^1.11.1"
+matplotlib = "^3.8.1"
+plotly = "^5.15.0"
+streamlit = "^1.24.0"
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^7.0"
