@@ -1,6 +1,7 @@
 from options_engine.pricing.black_scholes import black_scholes_price
 from options_engine.pricing.binomial import binomial_price
 from options_engine.pricing.monte_carlo import monte_carlo_price
+from options_engine.pricing.barrier import barrier_price_analytic, barrier_price_mc
 
 # ==== Function to compare pricing methods in command line ====
 
@@ -13,5 +14,23 @@ def compare_examples():
     print('Binomial Call:', bin_call)
     print('Monte Carlo Call:', mc_call)
 
+
+# ==== Function to compare barrier pricing methods in command line ====
+
+def compare_barrier_examples():
+    spot, strike, barrier, time_to_expiry, rate, sigma = 90, 100, 130, 1.0, 0.03, 0.25
+    steps = 252
+
+    continuous = barrier_price_analytic(spot, strike, barrier, time_to_expiry, rate, sigma)
+    matched = barrier_price_analytic(spot, strike, barrier, time_to_expiry, rate, sigma, monitoring_steps=steps)
+    mc = barrier_price_mc(spot, strike, barrier, time_to_expiry, rate, sigma, sims=100000, steps=steps, seed=1)
+
+    print('Up-and-Out Call (continuous monitoring, closed form):', continuous)
+    print(f'Up-and-Out Call (analytic, matched to {steps}-step monitoring):', matched)
+    print(f'Up-and-Out Call (Monte Carlo, {steps} steps):', mc)
+
+
 if __name__ == '__main__':
     compare_examples()
+    print()
+    compare_barrier_examples()
