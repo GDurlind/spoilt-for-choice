@@ -3,6 +3,8 @@ import math
 import numpy as np
 from scipy.stats import norm
 
+from options_engine.pricing.black_scholes import black_scholes_price
+
 # Broadie-Glasserman-Kou (1997) continuity correction constant: -zeta(1/2) / sqrt(2*pi).
 # A continuously-monitored closed form and a discretely-monitored simulation price
 # different things -- checking the barrier only at `steps` points lets a path spike
@@ -79,6 +81,23 @@ def barrier_price_analytic(spot: float, strike: float, barrier: float, time_to_e
     return A - B + C - D
 
 
+def barrier_price_up_and_in_analytic(spot: float, strike: float, barrier: float, time_to_expiry: float, rate: float, sigma: float, monitoring_steps: int = None) -> float:
+    """
+    Closed-form price for an up-and-in call, no rebate, via in-out parity:
+    knock-in + knock-out = vanilla. No separate formula is needed -- once
+    barrier_price_analytic (the knock-out leg) and the plain Black-Scholes
+    price are both trusted, the knock-in price falls out by subtraction.
+
+    Arguments: same as barrier_price_analytic.
+
+    Returns:
+    price (float): price of the up-and-in call
+    """
+    vanilla = black_scholes_price(spot, strike, time_to_expiry, rate, sigma, "call")
+    knock_out = barrier_price_analytic(spot, strike, barrier, time_to_expiry, rate, sigma, monitoring_steps=monitoring_steps)
+    return vanilla - knock_out
+
+
 def simulate_gbm_paths(spot: float, time_to_expiry: float, rate: float, sigma: float, sims: int = 10000, steps: int = 252, seed: int = None) -> np.ndarray:
     """
     Simulate risk-neutral GBM spot price paths, one step at a time from t=0.
@@ -146,6 +165,52 @@ def barrier_price_mc(spot: float, strike: float, barrier: float, time_to_expiry:
     else:
         payoffs = np.maximum(strike - terminal, 0.0)
     payoffs = np.where(breached, 0.0, payoffs)
+
+    price = math.exp(-rate * time_to_expiry) * np.mean(payoffs)
+    return price
+
+
+def barrier_price_up_and_in_mc(spot: float, strike: float, barrier: float, time_to_expiry: float, rate: float, sigma: float, option_type: str = "call", sims: int = 10000, steps: int = 252, seed: int = None) -> float:
+    """
+    Monte Carlo price for an up-and-in barrier option, via in-out parity.
+
+    Reuses the same simulated paths barrier_price_mc would use for the
+    knock-out leg: a path's vanilla payoff goes entirely to the knock-in
+    price if it breached the barrier, and entirely to the knock-out price
+    otherwise -- the two are complementary on every single path, so calling
+    this with the same (spot, strike, barrier, time_to_expiry, rate, sigma,
+    sims, steps, seed) as barrier_price_mc makes the two prices sum to the
+    vanilla price exactly, not just in expectation. No second simulation, and
+    no separate vanilla pricer call, is needed.
+
+    Arguments: same as barrier_price_mc.
+
+    Returns:
+    price (float): Monte Carlo price of the up-and-in barrier option
+    """
+    if time_to_expiry <= 0 or sigma <= 0:
+        if spot < barrier:
+            return 0.0
+        if option_type == "call":
+            return max(spot - strike, 0.0)
+        return max(strike - spot, 0.0)
+    if spot >= barrier:
+        # Already touched the barrier: knocked in from the start, so this is
+        # just a vanilla option -- reuse the plain Monte Carlo terminal draw.
+        terminal = simulate_gbm_paths(spot, time_to_expiry, rate, sigma, sims=sims, steps=1, seed=seed)[:, -1]
+        payoffs = np.maximum(terminal - strike, 0.0) if option_type == "call" else np.maximum(strike - terminal, 0.0)
+        return math.exp(-rate * time_to_expiry) * np.mean(payoffs)
+
+    paths = simulate_gbm_paths(spot, time_to_expiry, rate, sigma, sims=sims, steps=steps, seed=seed)
+
+    breached = np.any(paths >= barrier, axis=1)
+
+    terminal = paths[:, -1]
+    if option_type == "call":
+        payoffs = np.maximum(terminal - strike, 0.0)
+    else:
+        payoffs = np.maximum(strike - terminal, 0.0)
+    payoffs = np.where(breached, payoffs, 0.0)
 
     price = math.exp(-rate * time_to_expiry) * np.mean(payoffs)
     return price

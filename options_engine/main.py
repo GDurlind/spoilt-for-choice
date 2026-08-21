@@ -1,7 +1,12 @@
 from options_engine.pricing.black_scholes import black_scholes_price
 from options_engine.pricing.binomial import binomial_price
 from options_engine.pricing.monte_carlo import monte_carlo_price
-from options_engine.pricing.barrier import barrier_price_analytic, barrier_price_mc
+from options_engine.pricing.barrier import (
+    barrier_price_analytic,
+    barrier_price_mc,
+    barrier_price_up_and_in_analytic,
+    barrier_price_up_and_in_mc,
+)
 
 # ==== Function to compare pricing methods in command line ====
 
@@ -28,6 +33,17 @@ def compare_barrier_examples():
     print('Up-and-Out Call (continuous monitoring, closed form):', continuous)
     print(f'Up-and-Out Call (analytic, matched to {steps}-step monitoring):', matched)
     print(f'Up-and-Out Call (Monte Carlo, {steps} steps):', mc)
+
+    # Knock-in via in-out parity (knock-in + knock-out = vanilla) -- no
+    # separate formula or simulation, just reuses the knock-out functions above.
+    vanilla = black_scholes_price(spot, strike, time_to_expiry, rate, sigma, 'call')
+    knock_in_analytic = barrier_price_up_and_in_analytic(spot, strike, barrier, time_to_expiry, rate, sigma)
+    knock_in_mc = barrier_price_up_and_in_mc(spot, strike, barrier, time_to_expiry, rate, sigma, sims=100000, steps=steps, seed=1)
+
+    print()
+    print('Up-and-In Call (analytic, via parity):', knock_in_analytic)
+    print('Up-and-In Call (Monte Carlo, via parity):', knock_in_mc)
+    print('Check -- knock-in + knock-out vs vanilla:', knock_in_analytic + continuous, 'vs', vanilla)
 
 
 if __name__ == '__main__':
