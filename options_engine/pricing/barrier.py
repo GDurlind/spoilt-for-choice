@@ -79,6 +79,29 @@ def barrier_price_analytic(spot: float, strike: float, barrier: float, time_to_e
     return A - B + C - D
 
 
+def simulate_gbm_paths(spot: float, time_to_expiry: float, rate: float, sigma: float, sims: int = 10000, steps: int = 252, seed: int = None) -> np.ndarray:
+    """
+    Simulate risk-neutral GBM spot price paths, one step at a time from t=0.
+
+    Shared by barrier_price_mc and by anything (e.g. a notebook) that wants
+    to inspect or plot the raw paths rather than just the priced result.
+
+    Returns:
+    paths (np.ndarray): shape (sims, steps), path values at each step after
+        t=0 (the initial spot itself is not included as a column)
+    """
+    rng = np.random.default_rng(seed)
+    dt = time_to_expiry / steps
+
+    # Draw every step of every path in one shot, then cumulatively sum
+    # log-returns along the time axis so column j holds each path's
+    # log-return from t=0 up to step j.
+    Z = rng.standard_normal((sims, steps))
+    log_returns = (rate - 0.5 * sigma ** 2) * dt + sigma * math.sqrt(dt) * Z
+    log_paths = np.cumsum(log_returns, axis=1)
+    return spot * np.exp(log_paths)
+
+
 def barrier_price_mc(spot: float, strike: float, barrier: float, time_to_expiry: float, rate: float, sigma: float, option_type: str = "call", sims: int = 10000, steps: int = 252, seed: int = None) -> float:
     """
     Monte Carlo price for an up-and-out barrier option, no rebate.
@@ -113,16 +136,7 @@ def barrier_price_mc(spot: float, strike: float, barrier: float, time_to_expiry:
             return max(spot - strike, 0.0)
         return max(strike - spot, 0.0)
 
-    rng = np.random.default_rng(seed)
-    dt = time_to_expiry / steps
-
-    # Draw every step of every path in one shot, then cumulatively sum
-    # log-returns along the time axis so column j holds each path's
-    # log-return from t=0 up to step j.
-    Z = rng.standard_normal((sims, steps))
-    log_returns = (rate - 0.5 * sigma ** 2) * dt + sigma * math.sqrt(dt) * Z
-    log_paths = np.cumsum(log_returns, axis=1)
-    paths = spot * np.exp(log_paths)
+    paths = simulate_gbm_paths(spot, time_to_expiry, rate, sigma, sims=sims, steps=steps, seed=seed)
 
     breached = np.any(paths >= barrier, axis=1)
 
